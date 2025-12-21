@@ -1,36 +1,36 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- 1. DOCUMENTS TABLE
+-- Create documents table
 create table if not exists public.documents (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references auth.users(id) not null,
   title text not null,
   type text not null,
   size bigint not null,
-  status text not null default 'processing',
-  upload_date timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  word_count bigint default 0,
+  status text not null check (status in ('draft', 'processing', 'completed', 'failed')),
   file_url text,
   original_filename text,
-  template_id text
+  template_id text,
+  upload_date timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 2. EXTRACTED DATA TABLE
+-- Create extracted_data table
 create table if not exists public.extracted_data (
   id uuid default uuid_generate_v4() primary key,
   document_id uuid references public.documents(id) on delete cascade not null,
   json_payload jsonb not null,
-  confidence_score float,
+  confidence_score double precision,
   processed_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. ENABLE ROW LEVEL SECURITY
+-- Enable RLS
 alter table public.documents enable row level security;
 alter table public.extracted_data enable row level security;
 
--- 4. POLICIES FOR DOCUMENTS
--- (Using DO blocks in migrations usually, but here is the definition)
+-- Policies for documents
 create policy "Users can view their own documents"
   on public.documents for select
   using (auth.uid() = user_id);
@@ -47,29 +47,28 @@ create policy "Users can delete their own documents"
   on public.documents for delete
   using (auth.uid() = user_id);
 
--- 5. POLICIES FOR EXTRACTED DATA
-create policy "Users can view their own extracted data"
+-- Policies for extracted_data
+create policy "Users can view data for their documents"
   on public.extracted_data for select
   using (
     exists (
       select 1 from public.documents
-      where public.documents.id = public.extracted_data.document_id
-      and public.documents.user_id = auth.uid()
+      where documents.id = extracted_data.document_id
+      and documents.user_id = auth.uid()
     )
   );
 
-create policy "Users can insert extracted data for their documents"
+create policy "Users can insert data for their documents"
   on public.extracted_data for insert
   with check (
     exists (
       select 1 from public.documents
-      where public.documents.id = public.extracted_data.document_id
-      and public.documents.user_id = auth.uid()
+      where documents.id = extracted_data.document_id
+      and documents.user_id = auth.uid()
     )
   );
 
--- 6. STORAGE SETUP
--- Create avatars bucket
+-- Storage Bucket Setup
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;

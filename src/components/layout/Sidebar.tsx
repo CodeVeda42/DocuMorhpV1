@@ -1,6 +1,7 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Palette, Settings, LogOut, Wand2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -15,6 +16,20 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      navigate('/');
+    } catch (error) {
+      console.error("Error signing out:", error);
+      navigate('/');
+    }
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -71,12 +86,13 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         </div>
 
         <div className="border-t border-slate-200 dark:border-slate-800 p-4">
-          <NavLink to="/">
-              <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-              <LogOut className="h-4 w-4" />
-              Sign Out
-              </button>
-          </NavLink>
+          <button 
+            onClick={handleSignOut}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
         </div>
       </aside>
     </>

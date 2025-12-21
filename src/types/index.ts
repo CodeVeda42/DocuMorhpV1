@@ -81,6 +81,7 @@ export interface Document {
   title: string;
   type: string; // Should ideally be DocumentType, but keeping string for flexibility
   size: number;
+  wordCount?: number; // New field for analytics
   uploadDate: string;
   updatedAt: string;
   status: ProcessingStatus;

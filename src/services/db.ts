@@ -44,29 +44,36 @@ export const db = {
       
       // Map Supabase result to our Document type
       return data.map((doc: any) => {
-        const payload = doc.extracted_data?.[0]?.json_payload || {};
+        // Sort extracted_data to get the latest entry
+        const sortedData = doc.extracted_data?.sort((a: any, b: any) => 
+          new Date(b.processed_at).getTime() - new Date(a.processed_at).getTime()
+        );
+        
+        const latestData = sortedData?.[0];
+        const payload = latestData?.json_payload || {};
+
         return {
             id: doc.id,
             title: doc.title,
             type: doc.type,
             size: doc.size,
+            wordCount: doc.word_count || 0,
             uploadDate: doc.upload_date,
-            updatedAt: doc.updated_at || doc.upload_date, // Map updated_at or fallback
+            updatedAt: doc.updated_at || doc.upload_date,
             status: doc.status,
             fileUrl: doc.file_url,
             originalFileName: doc.original_filename || doc.title,
             templateId: doc.template_id || 'tpl-ieee',
             sections: payload.sections || [],
-            rawContent: payload.rawContent, // Retrieve raw content
-            result: doc.extracted_data?.[0] ? {
+            rawContent: payload.rawContent,
+            result: latestData ? {
                 ...payload,
-                confidenceScore: doc.extracted_data[0].confidence_score,
-                processedAt: doc.extracted_data[0].processed_at
+                confidenceScore: latestData.confidence_score,
+                processedAt: latestData.processed_at
             } : undefined
         };
       });
     } else {
-      // Refresh local docs from storage in case another tab updated it
       localDocuments = getLocalDocs();
       return new Promise(resolve => setTimeout(() => resolve([...localDocuments]), 500));
     }
@@ -89,25 +96,32 @@ export const db = {
         
         if (error) return undefined;
 
-        const payload = data.extracted_data?.[0]?.json_payload || {};
+        // Sort extracted_data to get the latest entry
+        const sortedData = data.extracted_data?.sort((a: any, b: any) => 
+          new Date(b.processed_at).getTime() - new Date(a.processed_at).getTime()
+        );
+        
+        const latestData = sortedData?.[0];
+        const payload = latestData?.json_payload || {};
 
         return {
             id: data.id,
             title: data.title,
             type: data.type,
             size: data.size,
+            wordCount: data.word_count || 0,
             uploadDate: data.upload_date,
-            updatedAt: data.updated_at || data.upload_date, // Map updated_at or fallback
+            updatedAt: data.updated_at || data.upload_date,
             status: data.status,
             fileUrl: data.file_url,
             originalFileName: data.original_filename || data.title,
             templateId: data.template_id || 'tpl-ieee',
             sections: payload.sections || [],
-            rawContent: payload.rawContent, // Retrieve raw content
-            result: data.extracted_data?.[0] ? {
+            rawContent: payload.rawContent,
+            result: latestData ? {
                 ...payload,
-                confidenceScore: data.extracted_data[0].confidence_score,
-                processedAt: data.extracted_data[0].processed_at
+                confidenceScore: latestData.confidence_score,
+                processedAt: latestData.processed_at
             } : undefined
         };
      } else {
@@ -123,14 +137,13 @@ export const db = {
       uploadDate: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       sections: [],
-      templateId: 'tpl-ieee', // Default
+      templateId: 'tpl-ieee',
       originalFileName: doc.originalFileName || doc.title
     };
 
     if (isSupabaseConfigured && supabase) {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || '00000000-0000-0000-0000-000000000000';
+      const userId = user?.id;
 
       const { data, error } = await supabase
         .from('documents')
@@ -138,10 +151,11 @@ export const db = {
           title: newDoc.title,
           type: newDoc.type,
           size: newDoc.size,
+          word_count: newDoc.wordCount || 0,
           status: newDoc.status,
           user_id: userId,
           file_url: (newDoc as any).fileUrl,
-          original_filename: newDoc.originalFileName // Enabled original filename
+          original_filename: newDoc.originalFileName
         })
         .select()
         .single();
@@ -156,10 +170,31 @@ export const db = {
     }
   },
 
+  updateDocument: async (id: string, updates: Partial<Document>) => {
+    if (isSupabaseConfigured && supabase) {
+      const dbUpdates: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (updates.title) dbUpdates.title = updates.title;
+      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.wordCount !== undefined) dbUpdates.word_count = updates.wordCount;
+
+      const { error } = await supabase
+        .from('documents')
+        .update(dbUpdates)
+        .eq('id', id);
+      
+      if (error) throw error;
+    } else {
+      localDocuments = localDocuments.map(d => d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d);
+      saveLocalDocs(localDocuments);
+    }
+  },
+
   saveExtractionResult: async (docId: string, result: any) => {
     if (isSupabaseConfigured && supabase) {
       // Update document status
-      await supabase.from('documents').update({ status: 'completed' }).eq('id', docId);
+      await supabase.from('documents').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', docId);
       
       // Insert extracted data
       await supabase.from('extracted_data').insert({
@@ -174,8 +209,9 @@ export const db = {
           ? { 
               ...d, 
               status: 'completed', 
+              updatedAt: new Date().toISOString(),
               sections: result.sections || [],
-              rawContent: result.rawContent, // Save raw content locally
+              rawContent: result.rawContent,
               result: { ...result, processedAt: new Date().toISOString() } 
             } 
           : d

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
@@ -13,26 +13,37 @@ import { userService } from './services/userService';
 import { Loader2 } from 'lucide-react';
 
 // Wrapper to protect routes that require authentication
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<boolean | null>(null);
   const location = useLocation();
 
   useEffect(() => {
+    // STRICT SECURITY: If Supabase is not configured, deny access.
+    // This prevents the "Demo Mode" bypass in production-like environments.
     if (!supabase) {
-      setSession(true); // Allow access if Supabase is not configured (demo mode)
+      setSession(false);
       return;
     }
     
+    // 1. Check active session immediately
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(!!session);
     });
+
+    // 2. Listen for auth changes (sign out, token expiry)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(!!session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   if (session === null) {
-    return <div className="h-screen w-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+    return <div className="h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-classic-dark"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
   }
 
   if (!session) {
+    // Redirect to Auth page, saving the location they tried to access
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 

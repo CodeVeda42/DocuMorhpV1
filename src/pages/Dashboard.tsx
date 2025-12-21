@@ -39,13 +39,9 @@ export const Dashboard = () => {
     doc.updatedAt && isAfter(new Date(doc.updatedAt), oneWeekAgo)
   ).length;
 
-  // 3. Words Processed (Estimate)
+  // 3. Words Processed (Using the new wordCount field for accuracy)
   const totalWords = documents.reduce((acc, doc) => {
-    // If we have parsed sections, count the words in them
-    const sectionWords = doc.sections?.reduce((count, section) => {
-      return count + (section.content ? section.content.split(/\s+/).length : 0);
-    }, 0) || 0;
-    return acc + sectionWords;
+    return acc + (doc.wordCount || 0);
   }, 0);
 
   const formattedWords = totalWords > 1000 

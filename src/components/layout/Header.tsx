@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bell, Search, User as UserIcon, Menu, Upload, LogOut, Settings as SettingsIcon, Camera, FileText, AlertCircle, Sun, Moon, Loader2, Check } from 'lucide-react';
+import { Search, User as UserIcon, Menu, Upload, LogOut, Settings as SettingsIcon, Camera, FileText, AlertCircle, Sun, Moon, Loader2, Check } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { useUser } from '../../hooks/useUser';
@@ -7,17 +7,11 @@ import { db } from '../../services/db';
 import { Document } from '../../types';
 import { cn } from '../../lib/utils';
 import { useTheme } from '../ThemeProvider';
+import { supabase } from '../../lib/supabase';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
-
-// Mock Notifications Data
-const INITIAL_NOTIFICATIONS = [
-  { id: 1, title: 'Welcome to DocuMorph', message: 'Start by uploading your first document.', time: 'Just now', read: false },
-  { id: 2, title: 'System Update', message: 'New "Markdown" template is now available.', time: '1h ago', read: false },
-  { id: 3, title: 'Tip', message: 'You can now export to multiple formats.', time: '1 day ago', read: true },
-];
 
 export const Header = ({ onMenuClick }: HeaderProps) => {
   const { user, updateProfile, uploadAvatar } = useUser();
@@ -26,15 +20,11 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   
   // Dropdown States
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
   
   // Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Document[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  
-  // Notification States
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
@@ -43,16 +33,12 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
-  const notifRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchFocused(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setIsNotifOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -133,15 +119,21 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
     setIsSearchFocused(false);
   };
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
   const toggleTheme = () => {
     if (theme === 'light') setTheme('dark');
     else setTheme('light');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      navigate('/');
+    } catch (error) {
+      console.error("Error signing out:", error);
+      navigate('/');
+    }
   };
 
   return (
@@ -221,61 +213,6 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
 
-        {/* Notifications */}
-        <div className="relative" ref={notifRef}>
-          <button 
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
-            className="relative rounded-full p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors outline-none"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
-            )}
-          </button>
-
-          {isNotifOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 z-20 animate-in fade-in zoom-in-95 duration-100 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-                <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Notifications</h3>
-                {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 font-medium">
-                    Mark all read
-                  </button>
-                )}
-              </div>
-              <div className="max-h-[300px] overflow-y-auto">
-                {notifications.length > 0 ? (
-                  notifications.map((notif) => (
-                    <div 
-                      key={notif.id} 
-                      className={cn(
-                        "px-4 py-3 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex gap-3",
-                        !notif.read && "bg-indigo-50/30 dark:bg-indigo-900/10"
-                      )}
-                    >
-                      <div className={cn(
-                        "h-2 w-2 rounded-full mt-1.5 shrink-0",
-                        notif.read ? "bg-slate-300 dark:bg-slate-600" : "bg-indigo-500"
-                      )} />
-                      <div>
-                        <p className="text-sm text-slate-900 dark:text-slate-100 font-medium">
-                          {notif.title}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{notif.message}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{notif.time}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">
-                    No notifications yet
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-        
         {/* Profile Dropdown Section */}
         <div className="relative">
           <button 
@@ -365,13 +302,13 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                 
                 <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                 
-                <Link 
-                  to="/" 
+                <button 
+                  onClick={handleSignOut}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign Out
-                </Link>
+                </button>
               </div>
             </>
           )}

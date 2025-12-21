@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Wand2, UploadCloud, FileText, ChevronLeft, Settings2, Eye, ZoomIn, ZoomOut, Maximize, ChevronDown, FileType, Printer } from 'lucide-react';
+import { Download, Wand2, UploadCloud, FileText, ChevronLeft, Settings2, Eye, ZoomIn, ZoomOut, Maximize, ChevronDown, FileType, Printer, Save } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { DEFAULT_TEMPLATES } from '../lib/mockData';
 import { Document, Template, DocumentSection } from '../types';
@@ -157,6 +157,7 @@ export const Editor = () => {
   const [activeTemplate, setActiveTemplate] = useState<Template>(DEFAULT_TEMPLATES[0]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [rawText, setRawText] = useState('');
   const [scale, setScale] = useState(0.55); // Default zoom level set to 55%
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -274,8 +275,67 @@ export const Editor = () => {
     }
   };
 
-  const handleExport = (type: 'docx' | 'txt' | 'md' | 'pdf') => {
+  const saveToDatabase = async () => {
     if (!doc) return;
+    setIsSaving(true);
+    
+    try {
+        // Calculate Word Count
+        const wordCount = doc.sections.reduce((acc, section) => {
+            return acc + (section.content ? section.content.split(/\s+/).length : 0);
+        }, 0);
+
+        // If it's a new document (id === 'new')
+        if (doc.id === 'new') {
+            const newDoc = await db.createDocument({
+                title: doc.title,
+                type: 'general', // Could infer from content
+                size: doc.rawContent?.length || 0,
+                wordCount: wordCount,
+                uploaderId: 'current-user', // Handled in db service
+                organizationId: 'current-org'
+            });
+            
+            // Save content
+            await db.saveExtractionResult(newDoc.id, {
+                sections: doc.sections,
+                rawContent: doc.rawContent,
+                confidenceScore: 1.0, // Manual/AI
+                summary: 'Generated via Editor'
+            });
+            
+            // Update local state and URL
+            setDoc(prev => prev ? { ...prev, id: newDoc.id, status: 'completed', wordCount } : null);
+            navigate(`/dashboard/editor/${newDoc.id}`, { replace: true });
+            return newDoc.id;
+        } else {
+            // Existing document - update content
+            await db.saveExtractionResult(doc.id, {
+                sections: doc.sections,
+                rawContent: doc.rawContent,
+                confidenceScore: doc.result?.confidenceScore || 1.0,
+                summary: doc.result?.summary
+            });
+            // Update timestamp, title & word count
+            await db.updateDocument(doc.id, { 
+                title: doc.title,
+                wordCount: wordCount,
+                updatedAt: new Date().toISOString() 
+            });
+            return doc.id;
+        }
+    } catch (error) {
+        console.error("Failed to save document:", error);
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const handleExport = async (type: 'docx' | 'txt' | 'md' | 'pdf') => {
+    if (!doc) return;
+    
+    // Auto-save on export to update dashboard stats
+    await saveToDatabase();
     
     switch (type) {
         case 'docx':
@@ -318,6 +378,7 @@ export const Editor = () => {
                     <Badge variant={doc.status === 'draft' ? 'secondary' : 'success'} className="text-[10px] px-1.5 py-0 h-4">
                         {doc.status}
                     </Badge>
+                    {isSaving && <span className="text-xs text-slate-400 animate-pulse">Saving...</span>}
                 </div>
             </div>
         </div>
@@ -333,6 +394,7 @@ export const Editor = () => {
                     size="sm" 
                     onClick={() => setIsExportOpen(!isExportOpen)} 
                     className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2"
+                    disabled={isSaving}
                 >
                     <Download className="h-4 w-4" />
                     <span className="hidden md:inline">Export</span>

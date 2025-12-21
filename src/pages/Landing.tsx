@@ -88,11 +88,12 @@ export const Landing = () => {
         
         {/* Content Overlay */}
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          {/* Badge Removed Here */}
           
-          <h1 className="mx-auto max-w-4xl text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-white mb-6 animate-in fade-in slide-in-from-bottom-8 delay-100 leading-tight">
-            Stop Formatting Manually. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Let AI Morph Your Docs.</span>
+          <h1 className="mx-auto max-w-5xl text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tight text-white mb-6 animate-in fade-in slide-in-from-bottom-8 delay-100 leading-tight">
+            Stop Formatting Manually. <br className="hidden sm:block" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+              Let Morph Your Docs.
+            </span>
           </h1>
           
           <p className="mx-auto max-w-2xl text-base sm:text-lg text-slate-400 mb-10 animate-in fade-in slide-in-from-bottom-8 delay-200 px-4">
