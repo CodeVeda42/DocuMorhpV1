@@ -67,12 +67,12 @@ VITE_OPENAI_API_KEY=your-openai-api-key-here
    ```
 
 2. **Connect to Netlify**:
-   - Go to https://app.netlify.com
+   - Go to https://documorhp.app.netlify.com
    - Click "Add new site" → "Import an existing project"
    - Connect your Git repository
 
 3. **Configure Build Settings** (should auto-detect from `netlify.toml`):
-   - Build command: `yarn build`
+   - Build command: `npm ci && npm run build`
    - Publish directory: `dist`
    - Node version: 18
 
@@ -112,7 +112,7 @@ VITE_OPENAI_API_KEY=your-openai-api-key-here
 - [x] ✅ React Router redirects configured
 - [ ] ⚠️ **Environment variables set in Netlify dashboard** (REQUIRED)
 - [ ] ⚠️ **Supabase project created and configured** (REQUIRED)
-- [ ] ⚠️ **Test build locally**: Run `yarn build` to verify it works
+- [ ] ⚠️ **Test build locally**: Run `npm run build` (or `yarn build`) to verify it works
 - [ ] ⚠️ **Database migrations**: Ensure Supabase migrations are applied
 - [ ] ⚠️ **Supabase storage buckets**: Verify storage buckets are created (for file uploads)
 
@@ -129,10 +129,12 @@ The app uses Supabase Storage (based on migration files). Ensure your storage bu
 - Verify bucket policies in: `20250214153000_fix_policy_conflicts.sql`
 
 ### Package Manager
-Your `package.json` specifies `yarn` as the preferred package manager. Netlify will use yarn if available. If you prefer npm, you can change the build command in `netlify.toml` to:
-```
-command = "npm run build"
-```
+The `netlify.toml` is configured to use `npm` for better reliability on Netlify's build environment. The build command uses `npm ci` (clean install) which ensures exact versions from `package-lock.json` and is faster/more reliable for CI/CD.
+
+**If you prefer to use Yarn:**
+1. Ensure `yarn.lock` is committed to your repository
+2. Update `netlify.toml` build command to: `yarn install && yarn build`
+3. Note: Some Netlify builds may have issues with Yarn, npm is recommended
 
 ### Build Performance
 - Consider enabling Netlify build caching for faster builds
@@ -146,6 +148,7 @@ command = "npm run build"
 1. Check Netlify build logs for errors
 2. Verify Node version is 18 or compatible
 3. Ensure all dependencies are in `package.json` (not missing)
+4. **Yarn Install Errors**: The configuration now uses `npm` instead of `yarn` for better Netlify compatibility. If you prefer yarn, ensure yarn.lock is committed and set build command to `yarn install && yarn build`
 
 ### Environment Variables Not Working
 1. **CRITICAL**: Environment variables MUST start with `VITE_` prefix for Vite to expose them
