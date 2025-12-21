@@ -1,6 +1,6 @@
 [build]
-  # Build command
-  command = "yarn build"
+  # Build command - using npm for better Netlify compatibility
+  command = "npm ci && npm run build"
   # Directory with the build output
   publish = "dist"
   # Node version (Netlify will use this)
